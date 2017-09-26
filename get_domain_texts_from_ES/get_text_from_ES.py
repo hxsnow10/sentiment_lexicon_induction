@@ -134,7 +134,7 @@ def query(domain_words_list,time_slice_start,time_slice_end):
                                     "content"
                                    ]
                        }
-    print query_statement
+    #print query_statement
     return query_statement
                                                                                 
 #进程请求的每篇文本保存为一个元组(text_from, text_title, text_content)
