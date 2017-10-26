@@ -6,6 +6,9 @@
 
 	脚本作用：
 		到ES中提取针对某个行业的文本，并保存到文件
+		
+	文本格式：
+        一行一篇文本，格式[来源\t文本标题\t文本内容]
 
 	脚本用法：
 		python get_text_using_existed_query.py -p [进程数] -d [天数(days)，爬取最近days天的文本]
@@ -22,6 +25,9 @@
 
 	脚本作用：
 		到ES中提取针对某个行业的文本，并保存到文件
+	
+	文本格式：
+        一行一篇文本，格式[来源\t文本标题\t文本内容]
 
 	脚本用法：
 		python get_text_using_domain_words.py -p [进程数] -d [天数(days)，爬取最近days天的文本]
