@@ -7,8 +7,10 @@ Created on Thu Sep 21 14:16:03 2017
 url = "http://172.24.4.21:9201"
 save_file = "text_data.txt"
 domain_words_file = "domain_words.txt"
-days = 30
-processes = 10
+processes = 10 #子进程的数量
+days = 1 #从Es中获取最近days天的文本
+time_slice_by_hour = 3 #时间片大小(小时)，一个进程从ES中获取一个时间片范围内的文本
+texts_amount = 1000 #在一个时间片范围内获取的文本数
 
 import argparse
 import requests
@@ -126,7 +128,7 @@ def query(domain_words_list,time_slice_start,time_slice_end):
                                   
                                   },
                         "from": 0,
-                        "size": 1000,
+                        "size": texts_amount,
                         "_source": [
                                     "docId",
                                     "docType",
@@ -134,7 +136,7 @@ def query(domain_words_list,time_slice_start,time_slice_end):
                                     "content"
                                    ]
                        }
-    print query_statement
+    #print query_statement
     return query_statement
                                                                                 
 #进程请求的每篇文本保存为一个元组(text_from, text_title, text_content)
@@ -210,7 +212,7 @@ def segment_time(start_time,end_time):
     slice_start = start_time
     #因为str_time是按'年月日时分秒'的顺序排列的，所以可以直接用字符串比较大小，来表示时间先后
     while slice_start < end_time:
-        slice_end = min( time_after_delta(slice_start, hours=6), end_time)
+        slice_end = min( time_after_delta(slice_start, hours=time_slice_by_hour), end_time)
         yield (slice_start, slice_end)
         slice_start = slice_end    
     
@@ -230,7 +232,7 @@ if __name__=='__main__':
     #为了提高效率,我们让多个进程进行网络请求，让一个进程将文本写入磁盘
     manager = multiprocessing.Manager()
     text_queue = manager.Queue()
-    pool=multiprocessing.Pool(processes = 10)
+    pool=multiprocessing.Pool(processes = args.processes)
     #创建一个写者进程,主进程不阻塞
     pool.apply_async(write_to_file, (text_queue, save_file) )
     #pool.apply()为阻塞版本，主进程会被阻塞直到子进程执行结束
