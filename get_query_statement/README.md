@@ -4,7 +4,7 @@
 	数据库中已经保存了针对这些行业的query语句
 
 脚本作用：
-	到数据库中提取针对某个行业的query语句，并保存到文件
+	到数据库中提取针对某个行业的query语句，并保存到文件.
 
 脚本用法：
 	python get_query_from_MySQL.py --industry [industry_name]
