@@ -21,6 +21,7 @@ import re
 import datetime
 import multiprocessing
 import sys
+import time
 
 #python专门设置了一种机制用来防止无限递归，防止内存溢出崩溃
 #对于字典、列表、元组的嵌套来说，有一个最大嵌套层数，不能无穷嵌套
@@ -141,34 +142,75 @@ def query(bool_query,time_slice_start,time_slice_end):
 #有多个进程进行网络请求，每个进程把自己的文本列表写入队列，写者进程从该队列批量获取文本
 def get_text_data(arguments_tuple):
     #argument_tuple是输入参数构成的元组，包含如下：
-    query_str_list,text_queue,time_slice_start,time_slice_end = arguments_tuple
+    query_str_list,query_num_array,text_queue,time_slice_start,time_slice_end = arguments_tuple
     #print bool_query_list
     search_url=url+"/bfd_mf/_search"
-    total_request = len(query_str_list)
-    count = 0
-    for bool_query_str in query_str_list:
+    request_num = len(query_str_list)
+    query_count = 0 #请求到第i个query
+    connectionError_count = 10
+    requestError_count = 10
+    parseError_count = 10
+    while query_count<request_num:
+        bool_query_str = query_str_list[query_count]
         bool_query = json.loads(bool_query_str)
         query_statement = query(bool_query, time_slice_start, time_slice_end)
-        response = requests.post(search_url, json.dumps(query_statement), timeout=None)
-        #timeout属性设置超时时间，一旦超过这个时间还没获得响应内容，就会提示错误
-        #返回的response是一个对象，利用response的属性可实现转化，转化为我们想要的类型
-        #response.content是json格式的序列化结果，是字符串类型
-        #print isinstance(response.content, str)
-        #print isinstance(json.loads(response.content), dict)
-        percent = round(count*100.0/total_request,1)
-        print str(response)+"\t"+str(percent)+"%"
-        count += 1
-        #print response.content
-        #ftemp = open('temp.txt','w')
-        #ftemp.write(response.content)
-        #ftemp.close()
-        
-        standard_content_strc = json.loads(response.content)
-        if "hits" not in standard_content_strc: return
-        if "hits" not in standard_content_strc["hits"]: return
-        #用json还原后的内容是unicode编码，需要将其重新编码为UTF-8格式
-        hits_text_list = renew_encoding( standard_content_strc["hits"]["hits"] )
-        
+        try:
+            response = requests.post(search_url, json.dumps(query_statement), timeout=None)
+            #timeout属性设置超时时间，一旦超过这个时间还没获得响应内容，就会提示错误
+            #返回的response是一个对象，利用response的属性可实现转化，转化为我们想要的类型
+            #response.content是json格式的序列化结果，是字符串类型
+            #print isinstance(response.content, str)
+            #print isinstance(json.loads(response.content), dict)
+        except Exception:
+            print "ConnectionError! Wait 10 minutes!"
+            sys.stdout.flush()
+            #如果和ES服务器连不通，比如网络中断，等待30分钟后重新请求
+            #如果重复请求10次仍然连不通，则放弃请求
+            if connectionError_count>0:
+                connectionError_count -= 1
+                time.sleep(30*60) #单位是秒
+                continue
+            else:
+                break
+        #能和ES服务器连通
+        #但ES服务器不稳定。当ES服务器不能正常响应时，进程休眠，过一段时间再重新请求
+        #http请求，当返回状态码为‘2xx’时，请求成功
+        #如果请求不成功，等待10分钟后重新请求
+        #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
+        if re.match(r'2\d{2}', str(response.status_code)) == None:
+            print "RequestError! Wait 10 minutes!"
+            sys.stdout.flush()
+            if requestError_count>0:
+                requestError_count -= 1
+                time.sleep(10*60) #单位是秒
+                continue
+            else:
+                query_count += 1
+                continue
+
+        try:
+            standard_content_strc = json.loads(response.content)
+            #用json还原后的内容是unicode编码，需要将其重新编码为UTF-8格式
+            hits_text_list = renew_encoding( standard_content_strc["hits"]["hits"] )
+        except Exception:
+            #如果响应结果为空，出现解析错误，等待1分钟后重新请求
+            #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
+            print "ParseResponseError! Wait 10 minutes!"
+            sys.stdout.flush()
+            if parseError_count>0:
+                parseError_count -= 1
+                time.sleep(1*60) #单位是秒
+                continue
+            else:
+                query_count += 1
+                continue
+        #query请求成功
+        query_count += 1
+        query_num_array[0] += 1     
+        percent = round(query_num_array[0]*100.0/query_num_array[1], 1)
+        print "Request OK"+"\t"+str(percent)+"%"
+        sys.stdout.flush()
+
         save_text_list = list()
         for text_of_dict_type in hits_text_list:
             #一些文本的字典格式中没有’content‘键，直接去取会出错
@@ -255,13 +297,18 @@ if __name__=='__main__':
     pool.apply_async(write_to_file, (text_queue, save_file) )
     #pool.apply()为阻塞版本，主进程会被阻塞直到子进程执行结束
     
+    #记录已经请求的query数量 和 总的query数量。query_num_array是一个对象。
+    #'i'即int,'f'即float，'d'即decimal
+    #query_num_array[0]是已经请求的query数量，query_num_array[1]是总的query数量
+    query_num_array = manager.Array('i', [0,0])
     #创建多个进程进行网络请求,执行函数为 get_text_data(arguments_tuple)
     #把大的时间段切分为小的时间片，一个网络请求进程负责获取一个时间片内的的文本数据
     #构建参数列表,列表的元素是arguments_tuple
     input_args_list = list()
     for slice_tuple in segment_time(start_time,end_time):
         slice_start, slice_end = slice_tuple
-        input_args_list.append( (query_str_list, text_queue, slice_start, slice_end) )
+        input_args_list.append( (query_str_list, query_num_array, text_queue, slice_start, slice_end) )
+    query_num_array[1] = len(input_args_list)*len(query_str_list)
     pool.map(get_text_data, input_args_list )
     #多个进程进行网络请求时，主进程阻塞
     #等待所有的网络请求进程执行完毕，然后主进程恢复执行。并不等待写者进程。
@@ -273,3 +320,4 @@ if __name__=='__main__':
     pool.join() #等待写者进程结束
     
     print("Done!")
+    sys.stdout.flush()
