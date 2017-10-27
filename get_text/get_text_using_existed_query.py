@@ -146,7 +146,7 @@ def get_text_data(arguments_tuple):
     #print bool_query_list
     search_url=url+"/bfd_mf/_search"
     request_num = len(query_str_list)
-    query_count = 0 #请求到第i个query
+    query_count = 0 #请求到第query_count个query
     connectionError_count = 10
     requestError_count = 10
     parseError_count = 10
@@ -162,8 +162,8 @@ def get_text_data(arguments_tuple):
             #print isinstance(response.content, str)
             #print isinstance(json.loads(response.content), dict)
         except Exception:
-            #如果和ES服务器连不通，比如网络中断，等待30分钟后重新请求
-            #如果重复请求10次仍然连不通，则放弃请求
+            #如果和ES服务器连不通，比如网络中断，等待10分钟后重新请求
+            #如果重复请求10次仍然连不通，则放弃该请求。进行下一个请求
             if connectionError_count>0:
                 connectionError_count -= 1
                 print "ConnectionError! Wait 10 minutes!"
@@ -171,21 +171,28 @@ def get_text_data(arguments_tuple):
                 time.sleep(10*60) #单位是秒
                 continue
             else:
-                break
+                #进行下一个请求
+                query_count += 1
+                query_num_array[0] += 1
+                connectionError_count = 10
+                continue
         #能和ES服务器连通
         #但ES服务器不稳定。当ES服务器不能正常响应时，进程休眠，过一段时间再重新请求
         #http请求，当返回状态码为‘2xx’时，请求成功
-        #如果请求不成功，等待2分钟后重新请求
+        #如果请求不成功，等待5分钟后重新请求
         #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
         if re.match(r'2\d{2}', str(response.status_code)) == None:
             if requestError_count>0:
                 requestError_count -= 1
                 print "RequestError! Wait 10 minutes!"
                 sys.stdout.flush()
-                time.sleep(2*60) #单位是秒
+                time.sleep(5*60) #单位是秒
                 continue
             else:
+                #进行下一个请求
                 query_count += 1
+                query_num_array[0] += 1
+                requestError_count = 10
                 continue
 
         try:
@@ -193,20 +200,27 @@ def get_text_data(arguments_tuple):
             #用json还原后的内容是unicode编码，需要将其重新编码为UTF-8格式
             hits_text_list = renew_encoding( standard_content_strc["hits"]["hits"] )
         except Exception:
-            #如果响应结果为空，出现解析错误，等待2分钟后重新请求
+            #如果响应结果为空，出现解析错误，等待5分钟后重新请求
             #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
             if parseError_count>0:
                 parseError_count -= 1
                 print "ParseResponseError! Wait 10 minutes!"
                 sys.stdout.flush()
-                time.sleep(2*60) #单位是秒
+                time.sleep(5*60) #单位是秒
                 continue
             else:
+                #进行下一个请求
                 query_count += 1
+                query_num_array[0] += 1
+                parseError_count = 10
                 continue
+        
         #query请求成功
         query_count += 1
-        query_num_array[0] += 1     
+        query_num_array[0] += 1
+        connectionError_count = 10
+        requestError_count = 10
+        parseError_count = 10
         percent = round(query_num_array[0]*100.0/query_num_array[1], 1)
         print "Request OK"+"\t"+str(percent)+"%"
         sys.stdout.flush()
