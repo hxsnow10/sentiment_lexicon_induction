@@ -162,27 +162,27 @@ def get_text_data(arguments_tuple):
             #print isinstance(response.content, str)
             #print isinstance(json.loads(response.content), dict)
         except Exception:
-            print "ConnectionError! Wait 10 minutes!"
-            sys.stdout.flush()
             #如果和ES服务器连不通，比如网络中断，等待30分钟后重新请求
             #如果重复请求10次仍然连不通，则放弃请求
             if connectionError_count>0:
                 connectionError_count -= 1
-                time.sleep(30*60) #单位是秒
+                print "ConnectionError! Wait 10 minutes!"
+                sys.stdout.flush()
+                time.sleep(10*60) #单位是秒
                 continue
             else:
                 break
         #能和ES服务器连通
         #但ES服务器不稳定。当ES服务器不能正常响应时，进程休眠，过一段时间再重新请求
         #http请求，当返回状态码为‘2xx’时，请求成功
-        #如果请求不成功，等待10分钟后重新请求
+        #如果请求不成功，等待2分钟后重新请求
         #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
         if re.match(r'2\d{2}', str(response.status_code)) == None:
-            print "RequestError! Wait 10 minutes!"
-            sys.stdout.flush()
             if requestError_count>0:
                 requestError_count -= 1
-                time.sleep(10*60) #单位是秒
+                print "RequestError! Wait 10 minutes!"
+                sys.stdout.flush()
+                time.sleep(2*60) #单位是秒
                 continue
             else:
                 query_count += 1
@@ -193,13 +193,13 @@ def get_text_data(arguments_tuple):
             #用json还原后的内容是unicode编码，需要将其重新编码为UTF-8格式
             hits_text_list = renew_encoding( standard_content_strc["hits"]["hits"] )
         except Exception:
-            #如果响应结果为空，出现解析错误，等待1分钟后重新请求
+            #如果响应结果为空，出现解析错误，等待2分钟后重新请求
             #如果重复请求10次仍然出错，则放弃该请求。进行下一个请求
-            print "ParseResponseError! Wait 10 minutes!"
-            sys.stdout.flush()
             if parseError_count>0:
                 parseError_count -= 1
-                time.sleep(1*60) #单位是秒
+                print "ParseResponseError! Wait 10 minutes!"
+                sys.stdout.flush()
+                time.sleep(2*60) #单位是秒
                 continue
             else:
                 query_count += 1
