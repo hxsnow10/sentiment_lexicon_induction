@@ -4,8 +4,8 @@ Created on Fri Sep 29 12:16:27 2017
 
 @author: hukai
 """
-source_file = "../get_text/text_data.txt"
-segment_result_file = "seg_result_text_new.txt"
+source_file = "../get_text/text_data_1.txt"
+segment_result_file = "seg_result_text1.txt"
 model_path = "../ltp_data_v3.4.0/cws.model" #Ltp3.4分词模型cws.model的路径
 processes = 10 #分词子进程的数量
 Queue_SIZE = 100 #共享队列能够容纳的元素个数
@@ -82,7 +82,7 @@ def seg_text(source_text_state, init_text_queue, seg_result_queue):
             #一个分词进程分的所有文本放进一个列表,一个列表项就是一篇文本
             for text in source_text_list:
                 seg_words_list = segmentor.segment(text)
-                seg_words_text = '|'.join(seg_words_list)
+                seg_words_text = ' '.join(seg_words_list)
                 seg_text_list.append(seg_words_text)
             #put()方法在队尾插入一个项目
             #如果队列已满，put()方法就使子进程阻塞,直到空出一个数据单元
