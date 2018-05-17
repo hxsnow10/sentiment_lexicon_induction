@@ -181,10 +181,10 @@ def get_expand_results(senti_dict_path, vec_path, deepth=1, r=0.8, topn=200, th=
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--senti_dict_path', default='senti_dict.txt')
-    parser.add_argument('-v', '--vec_paths', nargs='+')
-    parser.add_argument('-o', '--output_dir')
-    parser.add_argument('-vn', '--vocab_paths', nargs='+')
+    parser.add_argument('-s', '--senti_dict_path', default='senti_dict.txt', help="senti dict path")
+    parser.add_argument('-v', '--vec_paths', nargs='+', help="word vecs paths")
+    parser.add_argument('-o', '--output_dir', help="out dir")
+    parser.add_argument('-vn', '--vocab_paths', nargs='+', help="word vocab count paths")
     parser.add_argument('-d', '--deepth', type=int, default=1)
     parser.add_argument('-r', '--ratio', type=float, default=0.8)
     parser.add_argument('--topn', type=int, default=200)
